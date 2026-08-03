@@ -1,11 +1,4 @@
-/*=============================================================================
- * main.c
- *
- * Driver program that calls both the C kernel and the x86-64 assembly
- * kernel and compares their output.
- *
- * Build target: Windows x64 / Visual Studio (uses QueryPerformanceCounter).
- *=============================================================================*/
+//S25I - Miguel Ignacio
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,206 +8,177 @@
 
 #include "kernel_c.h"
 
-/* ---------------------------------------------------------------------
- * high resolution timer helpers (QueryPerformanceCounter)
- * ------------------------------------------------------------------- */
-static double qpc_freq(void) {
-    LARGE_INTEGER f;
-    QueryPerformanceFrequency(&f);
-    return (double)f.QuadPart;
-}
-
-static double qpc_now(double freq) {
-    LARGE_INTEGER t;
-    QueryPerformanceCounter(&t);
-    return (double)t.QuadPart / freq;
-}
-
-/* the x86-64 assembly kernel (see kernel_asm.asm) */
+// x86-64 assembly kernel declaration
 extern void distance_asm(int n,
-                          const double* X1, const double* X2,
-                          const double* Y1, const double* Y2,
-                          double* Z);
+                         const double* X1, const double* X2,
+                         const double* Y1, const double* Y2,
+                         double* Z);
 
-#define NUM_RUNS   30
-#define EPSILON    1e-9
+#define NUM_RUNS 30
+#define EPSILON 1e-6
 
-/* ---------------------------------------------------------------------
- * Step 1: worked example from the assignment (n = 4)
- * ------------------------------------------------------------------- */
-static void run_example(void) {
+// Helper for timing
+static double get_time_ms(LARGE_INTEGER start, LARGE_INTEGER end, LARGE_INTEGER freq) {
+    return ((double)(end.QuadPart - start.QuadPart) * 1000.0) / (double)freq.QuadPart;
+}
+
+// 1. Sanity check with the worked example from the assignment prompt (n = 4)
+void test_example() {
     double X1[4] = { 1.5, 4.0, 3.5, 2.0 };
     double X2[4] = { 3.0, 2.5, 2.5, 1.0 };
     double Y1[4] = { 4.0, 3.0, 3.5, 3.0 };
     double Y2[4] = { 2.0, 2.5, 1.0, 1.5 };
     double expected[4] = { 2.5, 1.58113883, 2.692582404, 1.802775638 };
-    double Zc[4], Za[4];
-    int i;
-    int ok_c = 1, ok_a = 1;
+    
+    double Z_c[4], Z_asm[4];
+    int pass_c = 1, pass_asm = 1;
 
-    printf("=========================================================\n");
-    printf(" STEP 1: Worked example (n = 4) - sanity check vs answer key\n");
-    printf("=========================================================\n");
+    printf("===========================================\n");
+    printf("   Sanity Check: Worked Example (n = 4)   \n");
+    printf("===========================================\n");
 
-    distance_c(4, X1, X2, Y1, Y2, Zc);
-    distance_asm(4, X1, X2, Y1, Y2, Za);
+    distance_c(4, X1, X2, Y1, Y2, Z_c);
+    distance_asm(4, X1, X2, Y1, Y2, Z_asm);
 
-    printf("%-4s %-14s %-14s %-14s\n", "i", "expected", "C kernel", "ASM kernel");
-    for (i = 0; i < 4; i++) {
-        printf("%-4d %-14.9f %-14.9f %-14.9f\n", i, expected[i], Zc[i], Za[i]);
-        if (fabs(Zc[i] - expected[i]) > EPSILON) ok_c = 0;
-        if (fabs(Za[i] - expected[i]) > EPSILON) ok_a = 0;
+    printf("i\tExpected\tC Kernel\tASM Kernel\n");
+    for (int i = 0; i < 4; i++) {
+        printf("%d\t%.8f\t%.8f\t%.8f\n", i, expected[i], Z_c[i], Z_asm[i]);
+        if (fabs(Z_c[i] - expected[i]) > EPSILON) pass_c = 0;
+        if (fabs(Z_asm[i] - expected[i]) > EPSILON) pass_asm = 0;
     }
-    printf("C kernel   vs answer key : %s\n", ok_c ? "PASS" : "FAIL");
-    printf("ASM kernel vs answer key : %s\n\n", ok_a ? "PASS" : "FAIL");
+
+    printf("C Kernel Status:   %s\n", pass_c ? "CORRECT" : "INCORRECT");
+    printf("ASM Kernel Status: %s\n\n", pass_asm ? "CORRECT" : "INCORRECT");
 }
 
-/* ---------------------------------------------------------------------
- * fills a buffer with random doubles in [lo, hi)
- * ------------------------------------------------------------------- */
-static void fill_random(double* a, int n, double lo, double hi) {
-    int i;
-    for (i = 0; i < n; i++) {
-        double r = (double)rand() / (double)RAND_MAX;
-        a[i] = lo + r * (hi - lo);
+// Fills vector with random double values
+void fill_random(double* vec, int n) {
+    for (int i = 0; i < n; i++) {
+        vec[i] = ((double)rand() / RAND_MAX) * 200.0 - 100.0;
     }
 }
 
-/* ---------------------------------------------------------------------
- * Step 2: correctness check between C and ASM on random data
- * ------------------------------------------------------------------- */
-static void run_correctness_check(int n) {
-    double *X1, *X2, *Y1, *Y2, *Zc, *Za;
-    int i;
-    double max_diff = 0.0;
-    int mismatches = 0;
+// 2. Correctness check on larger random dataset
+void check_correctness(int n) {
+    double *X1 = (double*)malloc(n * sizeof(double));
+    double *X2 = (double*)malloc(n * sizeof(double));
+    double *Y1 = (double*)malloc(n * sizeof(double));
+    double *Y2 = (double*)malloc(n * sizeof(double));
+    double *Z_c = (double*)malloc(n * sizeof(double));
+    double *Z_asm = (double*)malloc(n * sizeof(double));
 
-    printf("=========================================================\n");
-    printf(" STEP 2: Correctness check, C vs ASM (n = %d, random data)\n", n);
-    printf("=========================================================\n");
-
-    X1 = (double*)malloc(n * sizeof(double));
-    X2 = (double*)malloc(n * sizeof(double));
-    Y1 = (double*)malloc(n * sizeof(double));
-    Y2 = (double*)malloc(n * sizeof(double));
-    Zc = (double*)malloc(n * sizeof(double));
-    Za = (double*)malloc(n * sizeof(double));
-    if (!X1 || !X2 || !Y1 || !Y2 || !Zc || !Za) {
-        fprintf(stderr, "allocation failure in correctness check\n");
-        exit(1);
-    }
-
-    fill_random(X1, n, -100.0, 100.0);
-    fill_random(X2, n, -100.0, 100.0);
-    fill_random(Y1, n, -100.0, 100.0);
-    fill_random(Y2, n, -100.0, 100.0);
-
-    distance_c(n, X1, X2, Y1, Y2, Zc);
-    distance_asm(n, X1, X2, Y1, Y2, Za);
-
-    for (i = 0; i < n; i++) {
-        double d = fabs(Zc[i] - Za[i]);
-        if (d > max_diff) max_diff = d;
-        if (d > EPSILON) mismatches++;
-    }
-
-    printf("max |Zc - Za| = %.3e\n", max_diff);
-    printf("mismatches (> %.1e) = %d out of %d\n", EPSILON, mismatches, n);
-    printf("Correctness check: %s\n\n", (mismatches == 0) ? "PASS" : "FAIL");
-
-    free(X1); free(X2); free(Y1); free(Y2); free(Zc); free(Za);
-}
-
-/* ---------------------------------------------------------------------
- * Step 3: timing (kernel-only) averaged over NUM_RUNS, for a given n.
- * Prints first 10 elements of Z for both kernels.
- * ------------------------------------------------------------------- */
-static void run_timed_bench(int exp, double freq) {
-    long long n = 1LL << exp;
-    double *X1, *X2, *Y1, *Y2, *Zc, *Za;
-    int r, i, limit;
-    double t0, t1;
-    double total_c = 0.0, total_asm = 0.0;
-
-    printf("=========================================================\n");
-    printf(" STEP 3: Timing n = 2^%d (%lld elements), %d runs, kernel-only\n",
-           exp, n, NUM_RUNS);
-    printf("=========================================================\n");
-
-    X1 = (double*)malloc((size_t)n * sizeof(double));
-    X2 = (double*)malloc((size_t)n * sizeof(double));
-    Y1 = (double*)malloc((size_t)n * sizeof(double));
-    Y2 = (double*)malloc((size_t)n * sizeof(double));
-    Zc = (double*)malloc((size_t)n * sizeof(double));
-    Za = (double*)malloc((size_t)n * sizeof(double));
-    if (!X1 || !X2 || !Y1 || !Y2 || !Zc || !Za) {
-        fprintf(stderr, "allocation failure at n = 2^%d "
-                         "(machine may not have enough RAM - lower the exponent)\n", exp);
-        free(X1); free(X2); free(Y1); free(Y2); free(Zc); free(Za);
+    if (!X1 || !X2 || !Y1 || !Y2 || !Z_c || !Z_asm) {
+        printf("Memory allocation failed!\n");
         return;
     }
 
-    fill_random(X1, (int)n, -1000.0, 1000.0);
-    fill_random(X2, (int)n, -1000.0, 1000.0);
-    fill_random(Y1, (int)n, -1000.0, 1000.0);
-    fill_random(Y2, (int)n, -1000.0, 1000.0);
+    fill_random(X1, n);
+    fill_random(X2, n);
+    fill_random(Y1, n);
+    fill_random(Y2, n);
 
-    /* ---- C kernel timing ---- */
-    for (r = 0; r < NUM_RUNS; r++) {
-        t0 = qpc_now(freq);
-        distance_c((int)n, X1, X2, Y1, Y2, Zc);
-        t1 = qpc_now(freq);
-        total_c += (t1 - t0);
+    distance_c(n, X1, X2, Y1, Y2, Z_c);
+    distance_asm(n, X1, X2, Y1, Y2, Z_asm);
+
+    int correct = 1;
+    for (int i = 0; i < n; i++) {
+        if (fabs(Z_c[i] - Z_asm[i]) > EPSILON) {
+            correct = 0;
+            break;
+        }
     }
 
-    /* ---- ASM kernel timing ---- */
-    for (r = 0; r < NUM_RUNS; r++) {
-        t0 = qpc_now(freq);
-        distance_asm((int)n, X1, X2, Y1, Y2, Za);
-        t1 = qpc_now(freq);
-        total_asm += (t1 - t0);
+    printf("===========================================\n");
+    printf("  Correctness Check: C vs ASM (n = %d)  \n", n);
+    printf("===========================================\n");
+    printf("Output Match: %s\n\n", correct ? "PASS" : "FAIL");
+
+    free(X1); free(X2); free(Y1); free(Y2); free(Z_c); free(Z_asm);
+}
+
+// 3. Performance benchmark
+void run_benchmark(int exponent, LARGE_INTEGER freq) {
+    int n = 1 << exponent;
+    printf("===========================================\n");
+    printf(" Performance Benchmark: n = 2^%d (%d)\n", exponent, n);
+    printf("===========================================\n");
+
+    double *X1 = (double*)malloc(n * sizeof(double));
+    double *X2 = (double*)malloc(n * sizeof(double));
+    double *Y1 = (double*)malloc(n * sizeof(double));
+    double *Y2 = (double*)malloc(n * sizeof(double));
+    double *Z_c = (double*)malloc(n * sizeof(double));
+    double *Z_asm = (double*)malloc(n * sizeof(double));
+
+    if (!X1 || !X2 || !Y1 || !Y2 || !Z_c || !Z_asm) {
+        printf("Memory allocation failed for n = 2^%d! Skipping...\n\n", exponent);
+        free(X1); free(X2); free(Y1); free(Y2); free(Z_c); free(Z_asm);
+        return;
     }
 
-    printf("Average C   kernel time: %.6f ms\n", (total_c   / NUM_RUNS) * 1000.0);
-    printf("Average ASM kernel time: %.6f ms\n", (total_asm / NUM_RUNS) * 1000.0);
-    if (total_asm > 0.0)
-        printf("Speedup (C / ASM)      : %.3fx\n", total_c / total_asm);
+    fill_random(X1, n);
+    fill_random(X2, n);
+    fill_random(Y1, n);
+    fill_random(Y2, n);
 
-    limit = (n < 10) ? (int)n : 10;
-    printf("\nFirst %d elements of Z:\n", limit);
-    printf("%-4s %-16s %-16s\n", "i", "Z (C)", "Z (ASM)");
-    for (i = 0; i < limit; i++) {
-        printf("%-4d %-16.9f %-16.9f\n", i, Zc[i], Za[i]);
+    LARGE_INTEGER start, end;
+    double total_time_c = 0.0;
+    double total_time_asm = 0.0;
+
+    // Benchmark C Kernel
+    for (int r = 0; r < NUM_RUNS; r++) {
+        QueryPerformanceCounter(&start);
+        distance_c(n, X1, X2, Y1, Y2, Z_c);
+        QueryPerformanceCounter(&end);
+        total_time_c += get_time_ms(start, end, freq);
+    }
+
+    // Benchmark ASM Kernel
+    for (int r = 0; r < NUM_RUNS; r++) {
+        QueryPerformanceCounter(&start);
+        distance_asm(n, X1, X2, Y1, Y2, Z_asm);
+        QueryPerformanceCounter(&end);
+        total_time_asm += get_time_ms(start, end, freq);
+    }
+
+    double avg_c = total_time_c / NUM_RUNS;
+    double avg_asm = total_time_asm / NUM_RUNS;
+
+    printf("Average C Kernel Execution Time:   %.4f ms\n", avg_c);
+    printf("Average ASM Kernel Execution Time: %.4f ms\n", avg_asm);
+    printf("Speedup (C / ASM): %.2fx\n\n", avg_c / avg_asm);
+
+    // Display first 10 elements of vector Z
+    printf("First 10 elements of vector Z:\n");
+    printf("i\tZ (C)\t\tZ (ASM)\n");
+    for (int i = 0; i < 10 && i < n; i++) {
+        printf("%d\t%.8f\t%.8f\n", i, Z_c[i], Z_asm[i]);
     }
     printf("\n");
 
-    free(X1); free(X2); free(Y1); free(Y2); free(Zc); free(Za);
+    free(X1); free(X2); free(Y1); free(Y2); free(Z_c); free(Z_asm);
 }
 
-int main(void) {
-    double freq = qpc_freq();
+int main() {
     srand((unsigned int)time(NULL));
 
-    /* STEP 1 */
-    run_example();
+    LARGE_INTEGER freq;
+    QueryPerformanceFrequency(&freq);
 
-    /* STEP 2 */
-    run_correctness_check(1 << 16); /* 65536 random elements */
+    // Run worked example sanity check
+    test_example();
 
-    /* STEP 3 -----------------------------------------------------------
-     * n = 2^20, 2^24, 2^28.
-     * 2^30 needs 6 double arrays * 2^30 * 8 bytes =~ 51 GB of RAM, which
-     * is not realistic on most lab/personal machines, so per the
-     * assignment's allowance we scale down to 2^28. If your machine has
-     * enough RAM, add 30 to the exps[] array below to also test 2^30.
-     * ------------------------------------------------------------------*/
-    {
-        int exps[] = { 20, 24, 28 };
-        int i;
-        for (i = 0; i < (int)(sizeof(exps) / sizeof(exps[0])); i++) {
-            run_timed_bench(exps[i], freq);
-        }
+    // Run correctness check
+    check_correctness(65536);
+
+    // Run timing benchmark for n = 2^20, 2^24, 2^28
+    int exponents[] = { 20, 24, 28 };
+    int num_tests = sizeof(exponents) / sizeof(exponents[0]);
+
+    for (int i = 0; i < num_tests; i++) {
+        run_benchmark(exponents[i], freq);
     }
 
     return 0;
 }
+

@@ -1,24 +1,4 @@
-;=============================================================================
-; kernel_asm.asm
-;
-; void distance_asm(int n, double* X1, double* X2, double* Y1, double* Y2, double* Z)
-;
-; Computes Z[i] = sqrt( (X2[i]-X1[i])^2 + (Y2[i]-Y1[i])^2 )  for i = 0..n-1
-; using scalar SSE2 floating-point instructions (movsd/subsd/mulsd/addsd/sqrtsd)
-; operating on the low 64-bit lane of the XMM registers.
-;
-; Microsoft x64 calling convention (this is what MSVC/Visual Studio uses):
-;   ecx = n            (arg1, 32-bit int)
-;   rdx = X1            (arg2, pointer)
-;   r8  = X2            (arg3, pointer)
-;   r9  = Y1            (arg4, pointer)
-;   [rsp+40] = Y2        (arg5, pointer, passed on the stack)
-;   [rsp+48] = Z         (arg6, pointer, passed on the stack)
-;
-; NOTE: the stack-arg offsets (+40/+48) are only valid at function ENTRY,
-; before any pushes are done (32 bytes shadow space + 8 byte return address).
-; We grab them into registers first, before touching the stack.
-;=============================================================================
+;S25I - Miguel Ignacio
 
 .code
 
