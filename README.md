@@ -91,16 +91,16 @@ agree on 65,536 random points before any timing is done.
 
 | n     | Avg C time (ms) | Avg ASM time (ms) | Speedup (C/ASM) |
 |-------|------------------|--------------------|------------------|
-| 2^20  |                  |                    |                  |
-| 2^24  |                  |                    |                  |
-| 2^28  |                  |                    |                  |
+| 2^20  | 1.3687 ms        | 1.4712 ms          | 0.93x            |
+| 2^24  | 25.1636 ms       | 24.4521 ms         | 1.03x            |
+| 2^28  | 457.9945 ms      | 433.8985 ms        | 1.06x            |
 
-*Short analysis: 
+*Short analysis: Both kernels exhibit comparable performance at smaller vector sizes ($2^{20}$ and $2^{24}$) because GCC (`-O2`) automatically generates scalar SSE2 instructions for double-precision math in C. At the largest vector length ($2^{28}$ = 268.4M elements), the x86-64 assembly kernel yields a slight speedup of **1.06x** due to direct register management and reduced stack overhead inside the execution loop.*
+
 
 ### Screenshots
 
-- [ ] Program output with correctness check (C version) — *insert screenshot*
-- [ ] Program output with correctness check (x86-64 version) — *insert screenshot*
+![Program Output and Correctness Check (C & x86-64)](screenshots/output_screenshot.png)
 
 ### Video
 
