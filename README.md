@@ -87,8 +87,6 @@ agree on 65,536 random points before any timing is done.
 
 ---
 
-## ⬇️ Fill in after running on your machine
-
 ### Comparative execution time & analysis
 
 | n     | Avg C time (ms) | Avg ASM time (ms) | Speedup (C/ASM) |
@@ -97,10 +95,7 @@ agree on 65,536 random points before any timing is done.
 | 2^24  |                  |                    |                  |
 | 2^28  |                  |                    |                  |
 
-*Short analysis: (fill in — e.g. discuss whether ASM outperforms C, whether
-the gap grows/shrinks with n, cache effects at larger n, whether the
-compiler's own SSE2 codegen for the C version already closes most of the
-gap, etc.)*
+*Short analysis: 
 
 ### Screenshots
 
