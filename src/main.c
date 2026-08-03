@@ -15,12 +15,28 @@
 
 #include "kernel_c.h"
 
+/* ---------------------------------------------------------------------
+ * high resolution timer helpers (QueryPerformanceCounter)
+ * ------------------------------------------------------------------- */
+static double qpc_freq(void) {
+    LARGE_INTEGER f;
+    QueryPerformanceFrequency(&f);
+    return (double)f.QuadPart;
+}
+
+static double qpc_now(double freq) {
+    LARGE_INTEGER t;
+    QueryPerformanceCounter(&t);
+    return (double)t.QuadPart / freq;
+}
+
 /* the x86-64 assembly kernel (see kernel_asm.asm) */
 extern void distance_asm(int n,
                           const double* X1, const double* X2,
                           const double* Y1, const double* Y2,
                           double* Z);
 
+#define NUM_RUNS   30
 #define EPSILON    1e-9
 
 /* ---------------------------------------------------------------------
@@ -109,11 +125,96 @@ static void run_correctness_check(int n) {
     free(X1); free(X2); free(Y1); free(Y2); free(Zc); free(Za);
 }
 
+/* ---------------------------------------------------------------------
+ * Step 3: timing (kernel-only) averaged over NUM_RUNS, for a given n.
+ * Prints first 10 elements of Z for both kernels.
+ * ------------------------------------------------------------------- */
+static void run_timed_bench(int exp, double freq) {
+    long long n = 1LL << exp;
+    double *X1, *X2, *Y1, *Y2, *Zc, *Za;
+    int r, i, limit;
+    double t0, t1;
+    double total_c = 0.0, total_asm = 0.0;
+
+    printf("=========================================================\n");
+    printf(" STEP 3: Timing n = 2^%d (%lld elements), %d runs, kernel-only\n",
+           exp, n, NUM_RUNS);
+    printf("=========================================================\n");
+
+    X1 = (double*)malloc((size_t)n * sizeof(double));
+    X2 = (double*)malloc((size_t)n * sizeof(double));
+    Y1 = (double*)malloc((size_t)n * sizeof(double));
+    Y2 = (double*)malloc((size_t)n * sizeof(double));
+    Zc = (double*)malloc((size_t)n * sizeof(double));
+    Za = (double*)malloc((size_t)n * sizeof(double));
+    if (!X1 || !X2 || !Y1 || !Y2 || !Zc || !Za) {
+        fprintf(stderr, "allocation failure at n = 2^%d "
+                         "(machine may not have enough RAM - lower the exponent)\n", exp);
+        free(X1); free(X2); free(Y1); free(Y2); free(Zc); free(Za);
+        return;
+    }
+
+    fill_random(X1, (int)n, -1000.0, 1000.0);
+    fill_random(X2, (int)n, -1000.0, 1000.0);
+    fill_random(Y1, (int)n, -1000.0, 1000.0);
+    fill_random(Y2, (int)n, -1000.0, 1000.0);
+
+    /* ---- C kernel timing ---- */
+    for (r = 0; r < NUM_RUNS; r++) {
+        t0 = qpc_now(freq);
+        distance_c((int)n, X1, X2, Y1, Y2, Zc);
+        t1 = qpc_now(freq);
+        total_c += (t1 - t0);
+    }
+
+    /* ---- ASM kernel timing ---- */
+    for (r = 0; r < NUM_RUNS; r++) {
+        t0 = qpc_now(freq);
+        distance_asm((int)n, X1, X2, Y1, Y2, Za);
+        t1 = qpc_now(freq);
+        total_asm += (t1 - t0);
+    }
+
+    printf("Average C   kernel time: %.6f ms\n", (total_c   / NUM_RUNS) * 1000.0);
+    printf("Average ASM kernel time: %.6f ms\n", (total_asm / NUM_RUNS) * 1000.0);
+    if (total_asm > 0.0)
+        printf("Speedup (C / ASM)      : %.3fx\n", total_c / total_asm);
+
+    limit = (n < 10) ? (int)n : 10;
+    printf("\nFirst %d elements of Z:\n", limit);
+    printf("%-4s %-16s %-16s\n", "i", "Z (C)", "Z (ASM)");
+    for (i = 0; i < limit; i++) {
+        printf("%-4d %-16.9f %-16.9f\n", i, Zc[i], Za[i]);
+    }
+    printf("\n");
+
+    free(X1); free(X2); free(Y1); free(Y2); free(Zc); free(Za);
+}
+
 int main(void) {
+    double freq = qpc_freq();
     srand((unsigned int)time(NULL));
 
+    /* STEP 1 */
     run_example();
+
+    /* STEP 2 */
     run_correctness_check(1 << 16); /* 65536 random elements */
+
+    /* STEP 3 -----------------------------------------------------------
+     * n = 2^20, 2^24, 2^28.
+     * 2^30 needs 6 double arrays * 2^30 * 8 bytes =~ 51 GB of RAM, which
+     * is not realistic on most lab/personal machines, so per the
+     * assignment's allowance we scale down to 2^28. If your machine has
+     * enough RAM, add 30 to the exps[] array below to also test 2^30.
+     * ------------------------------------------------------------------*/
+    {
+        int exps[] = { 20, 24, 28 };
+        int i;
+        for (i = 0; i < (int)(sizeof(exps) / sizeof(exps[0])); i++) {
+            run_timed_bench(exps[i], freq);
+        }
+    }
 
     return 0;
 }
