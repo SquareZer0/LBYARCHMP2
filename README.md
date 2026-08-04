@@ -15,36 +15,85 @@ program is needed per version.
 ## Project layout
 
 ```
-VectorDistanceKernel.sln
-VectorDistanceKernel.vcxproj
-VectorDistanceKernel.vcxproj.filters
+build.bat        <- batch file that assemble, compile, and runs the software
 src/
   main.c         <- driver: example test, correctness check, timing
   kernel_c.c     <- C kernel (SSE2 scalar intrinsics)
   kernel_c.h
-  kernel_asm.asm <- x86-64 assembly kernel (MASM, scalar SSE2)
+  kernel_asm_nasm.asm <- x86-64 assembly kernel (NASM)
 ```
 
-## How to build (Visual Studio 2022)
+## Prerequisites
 
-1. Open `VectorDistanceKernel.sln`.
-2. **Enable MASM build customization** (only needed once per machine):
-   Right-click the project → *Build Dependencies* → *Build Customizations…*
-   → check **masm(.targets, .props)**. This is what lets Visual Studio
-   assemble `.asm` files with `ml64.exe`.
-3. Set the configuration to **Release | x64** (top toolbar). The project is
-   already configured to target x64, which is required for `ml64` and for
-   the Microsoft x64 calling convention used in `kernel_asm.asm`.
-4. Build → Build Solution (Ctrl+Shift+B).
-5. Run without debugging (Ctrl+F5).
+Before building and running the project, ensure the following are installed:
 
-> If you'd rather build from the command line with the "x64 Native Tools
-> Command Prompt for VS 2022", you can also do it manually:
-> ```
-> ml64 /c /Zi src\kernel_asm.asm
-> cl /O2 /c src\main.c src\kernel_c.c
-> link main.obj kernel_c.obj kernel_asm.obj /OUT:VectorDistanceKernel.exe
-> ```
+- NASM (64-bit)
+- GCC (MinGW-w64)
+- Visual Studio Code (optional, for development)
+- Windows Command Prompt or PowerShell
+
+Verify that NASM and GCC are available by running:
+
+```cmd
+nasm -v
+gcc -v
+```
+---
+
+# Running the Program in Visual Studio Code
+
+### 1. Open the Project
+
+Open the project folder in Visual Studio Code.
+
+Example:
+
+```
+LBYARCHMP2-main
+```
+
+### 2. Open a Terminal
+
+Go to:
+```
+Terminal → New Terminal
+```
+
+### 3. Build the Project
+Run:
+```powershell
+.\build.bat
+```
+
+### 4. Run the Executable
+```powershell
+.\VectorDistanceKernel.exe
+```
+
+---
+# Running the Program using Command Prompt (CMD)
+
+### 1. Navigate to the Project Folder and Open Command Prompt
+
+Example:
+
+```cmd
+cd C:\Users\geryl\Downloads\LBYARCHMP2-main\LBYARCHMP2-main
+```
+
+### 2. Build the Project
+```cmd
+build.bat
+```
+
+### 3. Run the Program
+```cmd
+VectorDistanceKernel.exe
+```
+
+---
+
+
 
 ## What the program does when run
 
