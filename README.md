@@ -1,3 +1,5 @@
+# Github Link: https://github.com/SquareZer0/LBYARCHMP2/tree/main
+
 # Vector Distance Kernel — C and x86-64 Assembly (Scalar SIMD)
 
 Computes `Z[i] = sqrt((X2[i]-X1[i])^2 + (Y2[i]-Y1[i])^2)` for two versions of
