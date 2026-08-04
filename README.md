@@ -154,4 +154,4 @@ agree on 65,536 random points before any timing is done.
 ### Video
 
 - [ ] 5–10 min video showing source code, compilation, and execution of the
-      C and x86-64 program — https://drive.google.com/file/d/18nSc7gsfwqZkvanlVOwL-Xah52xbWizN/view?usp=sharing
+      C and x86-64 program — https://drive.google.com/file/d/1g6RhsMxAyuCvT7evSTVVNBSgblI_5dVD/view?usp=sharing
